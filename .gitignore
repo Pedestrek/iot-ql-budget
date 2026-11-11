@@ -1,0 +1,15 @@
+# Resultados das simulações (figuras e dados)
+plots/
+*.mat
+*.fig
+
+# Arquivos temporários do MATLAB
+*.asv
+*.m~
+*.mex*
+slprj/
+
+# Sistema e editores
+.DS_Store
+Thumbs.db
+.vscode/

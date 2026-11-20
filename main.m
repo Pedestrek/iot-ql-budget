@@ -67,39 +67,49 @@ S = plotStyle();
 %==========================================================================
 if(SIMUL_choice == 1)
     disp('--- Running Simulation 1: Fixed Energy Cost under the Mission Rules ---');
-    % Rows: survival [%], throughput, goodput, replicas per live device, silent frames [%]
-    fixed_metrics = @(r) [r.survival; r.throughput; r.goodput; r.mean_replicas; 100*r.frac_silent];
+    % Rows: survival [%], throughput, goodput, replicas per live device, silent frames [%],
+    %       network energy spent within the mission [%]
+    fixed_metrics = @(r) [r.survival; r.throughput; r.goodput; r.mean_replicas; 100*r.frac_silent; ...
+                          100*(1 - sum(r.battery_final)/sum(r.battery0))];
     one_seed = @(seed) cell2mat(arrayfun(@(c) fixed_metrics(runMission(setfield(mission, 'energy_cost', c), phy, seed)), ...
                                          costs, 'UniformOutput', false));
     res = convergeSeeds(one_seed, seeds, seeds, 0, seeds);
 
-    fprintf('%8s %12s %11s %9s %10s %9s\n', 'cost', 'survival', 'throughput', 'goodput', 'replicas', 'silent');
+    fprintf('%8s %12s %11s %9s %10s %9s %9s\n', 'cost', 'survival', 'throughput', 'goodput', 'replicas', 'silent', 'energy');
     for i = 1:numel(costs)
-        fprintf('%8.1f %11.1f%% %11.4f %9.4f %10.3f %8.1f%%\n', costs(i), res(:,i));
+        fprintf('%8.1f %11.1f%% %11.4f %9.4f %10.3f %8.1f%% %8.1f%%\n', costs(i), res(:,i));
     end
 
-    % Plotting
+    % Plotting: one quantity per axis (no double y axis); the dotted line
+    % marks the fixed cost that delivers the most (c = 0.3)
     %%
     saveData('sim1', costs, res);
-    figure('Units', 'centimeters', 'Position', [2 2 S.width S.height_row]);
-    tl = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+    figure('Units', 'centimeters', 'Position', [2 2 S.width S.height_row + 0.6]);
+    tl = tiledlayout(1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+    c_best = 0.3; ct = [0 0.3 0.6 0.9 1.2];
+    best = @(ax, yl) plot(ax, [c_best c_best], yl, ':', 'Color', S.c_grey, 'LineWidth', 1);
+    ax1 = nexttile(tl); ax = ax1;
+    styleAxes(ax, S, 'Sobrevivência e energia', 'custo de energia c', 'porcentagem [%]');
+    hb = best(ax, [0 105]);
+    hs = plot(ax, costs, res(1,:), '-o', 'Color', S.c_fixed, 'LineWidth', S.lw, 'MarkerSize', S.ms, 'MarkerFaceColor', S.c_fixed);
+    he = plot(ax, costs, res(6,:), '--o', 'Color', S.c_fixed, 'LineWidth', S.lw, 'MarkerSize', S.ms, 'MarkerFaceColor', 'w');
+    xticks(ax, ct); xlim(ax, [0 1.25]); ylim(ax, [0 105]); ax.XTickLabelRotation = 0;
     ax = nexttile(tl);
-    styleAxes(ax, S, 'Sobrevivência ao fim da missão', 'custo de energia c', 'sobrevivência [%]');
-    plot(ax, costs, res(1,:), '-o', 'Color', S.c_fixed, 'LineWidth', S.lw, 'MarkerSize', S.ms, 'MarkerFaceColor', S.c_fixed);
-    xticks(ax, [0.2 0.4 0.6 0.8 1 1.2]); ylim(ax, [0 105]);
+    styleAxes(ax, S, 'Réplicas', 'custo de energia c', 'réplicas por dispositivo ativo');
+    best(ax, [0 1.6]);
+    plot(ax, [0 1.25], [0.75 0.75], '--', 'Color', S.c_grey, 'LineWidth', 1);
+    text(ax, 1.22, 0.77, {'orçamento da', 'bateria média'}, 'FontSize', S.fs_point, 'Color', S.c_grey, ...
+         'HorizontalAlignment', 'right', 'VerticalAlignment', 'bottom');
+    plot(ax, costs, res(4,:), '-o', 'Color', S.c_fixed, 'LineWidth', S.lw, 'MarkerSize', S.ms, 'MarkerFaceColor', S.c_fixed);
+    xticks(ax, ct); xlim(ax, [0 1.25]); ylim(ax, [0 1.6]); ax.XTickLabelRotation = 0;
     ax = nexttile(tl);
-    styleAxes(ax, S, 'Política aprendida', 'custo de energia c', '');
-    yyaxis(ax, 'left');
-    hp = gobjects(1, 2);
-    hp(1) = plot(ax, costs, res(4,:), '-o', 'Color', S.c_fixed, 'LineWidth', S.lw, 'MarkerSize', S.ms, 'MarkerFaceColor', S.c_fixed);
-    ylabel(ax, 'réplicas por dispositivo ativo', 'FontSize', S.fs); ax.YColor = S.c_fixed;
-    yyaxis(ax, 'right');
-    hp(2) = plot(ax, costs, res(5,:), '--o', 'Color', S.c_fixed, 'LineWidth', S.lw, 'MarkerSize', S.ms, 'MarkerFaceColor', 'w');
-    ylabel(ax, 'dispositivos ativos em silêncio [%]', 'FontSize', S.fs); ax.YColor = S.c_fixed;
-    xticks(ax, [0.2 0.4 0.6 0.8 1 1.2]);
-    lg = legend(ax, hp, {'réplicas (esq.)', 'silêncio (dir.)'}, 'FontSize', S.fs_legend);
-    drawnow; p = ax.Position;                          % free area: high costs, between the two curves
-    lg.Position(1:2) = [p(1) + 0.60*p(3), p(2) + 0.30*p(4)];
+    styleAxes(ax, S, 'Silêncio', 'custo de energia c', 'dispositivos ativos em silêncio [%]');
+    best(ax, [0 105]);
+    plot(ax, costs, res(5,:), '-o', 'Color', S.c_fixed, 'LineWidth', S.lw, 'MarkerSize', S.ms, 'MarkerFaceColor', S.c_fixed);
+    xticks(ax, ct); xlim(ax, [0 1.25]); ylim(ax, [0 105]); ax.XTickLabelRotation = 0;
+    lg = legend(ax1, [hs he hb], {'sobrevivência ao fim da missão', 'energia da rede gasta na missão', 'c = 0.3 (máximo de entregas)'}, ...
+                'NumColumns', 3, 'FontSize', S.fs_legend);
+    lg.Layout.Tile = 'south';
     exportFigure(gcf, 'sim1_custo_fixo');
 end
 
